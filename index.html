@@ -6,7 +6,7 @@
 <title>日课问道</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=ZCOOL+XiaoWei&family=Noto+Serif+SC:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;600&display=swap" rel="stylesheet">
 <style>
 :root{
   /* Layout: a hanging scroll. The painting sits on top with a vertical inscription and a seal;
@@ -16,7 +16,7 @@
   --azurite:#4a93c4; --malachite:#45ab8f; --gold:#d6ad55; --cinnabar:#d65f44; --on-accent:#0d1924;
   --sky1:#091420; --sky2:#1a3350; --m1:#234c6b; --m2:#1c5b72; --m3:#1b6a5d; --m4:#0f3540;
   --f-brush:"Ma Shan Zheng","STKaiti","KaiTi","Kaiti SC",cursive;
-  --f-head:"ZCOOL XiaoWei","Songti SC","STSong","Noto Serif CJK SC",serif;
+  --f-head:"Noto Serif SC","Songti SC","STSong","Noto Serif CJK SC",serif;
   --f-body:"Noto Serif SC","Songti SC","STSong","Noto Serif CJK SC","SimSun",serif;
   color-scheme:dark;
 }
@@ -160,6 +160,8 @@ h2 small{font-family:var(--f-body);font-size:12.5px;color:var(--muted);letter-sp
 .bar.hp i{background:var(--cinnabar);transition:width .3s}
 .row .mark{width:30px;height:30px;display:grid;place-items:center;background:var(--cinnabar);color:#f6ead6;font-family:var(--f-head);
   font-size:15px;border-radius:4px;transform:rotate(-4deg);flex:none}
+/* headings share the body family, set apart by weight */
+h2,.card h3,.habit b,.row b,.gauge-row .xp b,.tabs button[aria-selected=true],.seg button[aria-selected=true],.colophon .dao{font-weight:600}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
