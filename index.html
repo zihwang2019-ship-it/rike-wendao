@@ -153,7 +153,7 @@ h2 small{font-family:var(--f-body);font-size:12.5px;color:var(--muted);letter-sp
 @keyframes floatUp{to{transform:translate(-50%,-250%);opacity:0}}
 /* segmented control inside 洞府 */
 .seg{position:sticky;top:-14px;z-index:2;background:var(--bg);display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:8px;overflow:hidden;flex:none}
-.seg button{border:0;background:transparent;padding:7px 0;font-family:var(--f-head);font-size:15px;letter-spacing:.08em;color:var(--muted)}
+.seg button{border:0;background:transparent;padding:7px 0;font-family:var(--f-head);font-size:15px;letter-spacing:.04em;color:var(--muted)}
 .seg button+button{border-left:1px solid var(--line)}
 .seg button[aria-selected=true]{background:var(--surface);color:var(--ink);box-shadow:inset 0 -2px 0 var(--gold)}
 .group{font-family:var(--f-head);font-size:13px;color:var(--muted);letter-spacing:.2em;padding-top:8px}
@@ -250,6 +250,15 @@ const PETS={
   hu:{n:'赤焰虎',d:lv=>'吐纳所得 +'+(30+5*(lv-1))+'%'}
 };
 const PET_MAX=10;
+const TALS={
+  wu:{n:'悟性',d:l=>'修炼速度 +'+25*l+'%',step:'每级 +25%',max:20,c:l=>2+l},
+  gen:{n:'根骨',d:l=>'各境界所需修为 −'+5*l+'%',step:'每级 −5%',max:8,c:l=>3+l},
+  ling:{n:'先天灵根',d:l=>l?'来世灵根至少是'+GRADES[l].n:'来世灵根听天由命',step:'保底品阶升一等，下次投胎生效',max:3,c:l=>[4,10,20][l]},
+  su:{n:'宿慧',d:l=>'来世自炼气'+['一','三','五','七','九'][l]+'层起步',step:'起步高两层，下次投胎生效',max:4,c:l=>2+l},
+  fu:{n:'福缘',d:l=>'灵石收入 +'+15*l+'%，来世初始气运 +'+5*l,step:'每级灵石 +15%、气运 +5',max:6,c:l=>2+l},
+  xin:{n:'道心',d:l=>'冲关成算 +'+3*l+'%',step:'每级 +3%',max:6,c:l=>3+l},
+  yi:{n:'遗泽',d:l=>'轮回时留下 '+15*l+'% 的灵石、功法层数与宗门贡献',step:'每级多留 15%',max:4,c:l=>3+2*l}
+};
 const BOUNTIES={tap:{n:'吐纳',u:'次',g:[60,120]},cycle:{n:'周天圆满',u:'次',g:[5,10]},orb:{n:'采集灵气',u:'团',g:[3,5]},
   job:{n:'办结差事',u:'件',g:[1,2]},event:{n:'探访机缘',u:'道',g:[2,3]},habit:{n:'完成日课',u:'项',g:[1,2]},
   harvest:{n:'收取灵田',u:'次',g:[1,1]},boost:{n:'运功',u:'次',g:[2,3]},floor:{n:'闯过秘境',u:'层',g:[3,5]}};
@@ -414,18 +423,18 @@ function branchIdx(t){return Math.floor(((new Date(t).getHours()+1)%24)/2);}
 function nextBranch(t){const d=new Date(t),h=d.getHours();d.setHours(h%2===1?h+2:h+1,0,0,0);return d.getTime();}
 function isDay(t){const h=new Date(t).getHours();return h>=5&&h<19;}
 function logTime(t){const d=new Date(t);return pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+BRANCH[branchIdx(t)]+'时';}
-const req=i=>Math.round(60*Math.pow(1.625,i));
+const req=i=>Math.round(60*Math.pow(1.625,i)*(1-.05*((S&&S.tal&&S.tal.gen)||0)));
 const sc=()=>1+.3*S.stage;
 const price=n=>Math.round(n*sc());
 
 /* ---------- state ---------- */
 let S=null, fresh=false, loadedSavedAt=0;
-const ui={tab:'xiu',seg:'dong',yseg:'qi',zseg:'shi',trial:null,editHabits:false,draft:null,editName:false,confirmReset:false,liveKey:''};
+const ui={tab:'xiu',seg:'dong',yseg:'qi',zseg:'shi',trial:null,confirmLun:false,editHabits:false,draft:null,editName:false,confirmReset:false,liveKey:''};
 const cloud={ref:null,ready:false,busy:false,dirty:false,state:'local'};
 
-function rollRoot(){
+function rollRoot(min){
   let roll=Math.random()*100,g=0;for(let i=0;i<GRADES.length;i++){if(roll<GRADES[i].w){g=i;break;}roll-=GRADES[i].w;}
-  return {el:pick(Object.keys(ROOTS)),g};
+  return {el:pick(Object.keys(ROOTS)),g:Math.max(g,min||0)};
 }
 function newGame(now){
   const root=rollRoot();
@@ -438,6 +447,7 @@ function newGame(now){
     sect:pick(SECTS),contrib:0,sectTotal:0,payDay:'',jobs:[],field:1,fieldAt:now,
     arts:{yinqi:1},mainArt:'yinqi',pets:{},pet:'',teaUntil:0,boostUntil:0,boostAt:0,taps:0,cycle:0,
     shop:{day:dayKey(now),fate:0,page:0},
+    tal:{wu:0,gen:0,ling:0,su:0,fu:0,xin:0,yi:0},fruit:0,life:1,limbo:false,limboGain:0,
     stat:{},ach:{},flags:{},draws:0,bounty:{day:'',list:[],bonus:false},dg:{day:'',n:0},run:null,lastRun:null,gear:[],log:[]};
   const push=(x,k)=>s.log.unshift({t:now,x,k});
   push('你在山门前站了很久，终于迈过那道门槛。测灵石亮起：'+root.el+'属'+GRADES[root.g].n+'。','key');
@@ -466,6 +476,10 @@ function hydrate(raw,now){
   if(!s.bounty||!Array.isArray(s.bounty.list))s.bounty={day:'',list:[],bonus:false};
   if(!s.dg||typeof s.dg!=='object')s.dg={day:'',n:0};
   if(typeof s.draws!=='number')s.draws=0;
+  if(!raw.tal&&raw.stat)s.log.unshift({t:now,x:'后山深处多了一座轮回殿。修到金丹，便可散功入轮回，以道果换来世的天赋。',k:'key'});
+  s.tal=Object.assign({wu:0,gen:0,ling:0,su:0,fu:0,xin:0,yi:0},s.tal&&typeof s.tal==='object'?s.tal:{});
+  if(typeof s.fruit!=='number')s.fruit=0;
+  if(typeof s.life!=='number')s.life=1;
   if(!s.arts||typeof s.arts!=='object')s.arts={yinqi:1};
   if(!s.arts[s.mainArt])s.mainArt=Object.keys(s.arts)[0]||'yinqi';
   if(!s.pets||typeof s.pets!=='object')s.pets={};
@@ -488,10 +502,10 @@ function eff(){
   for(const a of ACHS)if(S.ach[a.id])for(const k in a.e)acc[k]+=a.e[k];
   for(const g of S.gear)if(g.on&&GEAR[g.t])acc[g.t]+=gearVal(g);
   return {
-    rate:(1+.12*artLv('yinqi')+.06*artLv('changchun')+.05*artLv('taixu'))*(1+.04*rankIdx())*(is('luan')?1.08+.02*(p-1):1)*(1+acc.rate),
-    stone:1+.08*artLv('jubao')+(is('shu')?.10+.03*(p-1):0)+acc.stone,
+    rate:(1+.12*artLv('yinqi')+.06*artLv('changchun')+.05*artLv('taixu'))*(1+.04*rankIdx())*(is('luan')?1.08+.02*(p-1):1)*(1+acc.rate)*(1+.25*S.tal.wu),
+    stone:1+.08*artLv('jubao')+(is('shu')?.10+.03*(p-1):0)+acc.stone+.15*S.tal.fu,
     tap:1+.25*artLv('tuna')+(is('hu')?.30+.05*(p-1):0)+acc.tap,
-    brk:.03*artLv('taixu')+(is('gui')?.05+.01*(p-1):0)+acc.brk,
+    brk:.03*artLv('taixu')+(is('gui')?.05+.01*(p-1):0)+acc.brk+.03*S.tal.xin,
     luck:(is('fox')?10+2*(p-1):0)+acc.luck,
     cap:DAY+2*HOUR*artLv('changchun'),
     hp:Math.round(100+10*rankIdx()+acc.hp),
@@ -515,11 +529,12 @@ function rateAt(t){
   if(t<S.demonUntil)r*=.75;
   return r;
 }
-const atWall=()=>STAGES[S.stage].last&&S.xp>=req(S.stage);
+const atWall=()=>!S.limbo&&STAGES[S.stage].last&&S.xp>=req(S.stage);
 function stageUp(t){S.stage++;S.xp=0;log('水到渠成，踏入'+STAGES[S.stage].name+'。','key',t);}
 function hitWall(t){if(!S.stuck){S.stuck=true;log('修为已至'+STAGES[S.stage].name+'瓶颈，再坐无益，需亲手冲关。','key',t);return true;}return false;}
 function advance(to){
   const res={xp:0,ups:0,fate:0,wall:false,capped:false},cap=eff().cap;
+  if(S.limbo){S.ts=to;dayRoll(to);return res;}
   if(to-S.ts>cap){S.ts=to-cap;res.capped=true;}
   let guard=0;
   while(S.ts<to&&guard++<800){
@@ -539,13 +554,16 @@ function advance(to){
     while(S.fate<FATE_CAP&&S.fateAt<=to){S.fate++;res.fate++;S.fateAt+=FATE_INT;}
   }
   if(S.fate>=FATE_CAP)S.fateAt=0;
+  dayRoll(to);
+  return res;
+}
+function dayRoll(to){
   if(to>=S.streakUntil&&S.streak)S.streak=0;
   const today=dayKey(to);
   if(S.done.day!==today)S.done={day:today,ids:[]};
   if(S.shop.day!==today)S.shop={day:today,fate:0,page:0};
   if(S.bounty.day!==today)rollBounty(today);
   if(S.dg.day!==today)S.dg={day:today,n:0};
-  return res;
 }
 function addXp(amt,now){
   S.xp+=amt;
@@ -615,7 +633,7 @@ function floatText(x,y,txt,cls){
 }
 let lastTap=0;
 function breathe(x,y){
-  const now=Date.now();if(now-lastTap<70)return;lastTap=now;
+  const now=Date.now();if(S.limbo||now-lastTap<70)return;lastTap=now;
   advance(now);
   const e=eff(),stage=S.stage,wall=atWall();
   let a=0,txt;
@@ -631,6 +649,7 @@ function breathe(x,y){
   updateLive(now);
 }
 function collectOrb(b){
+  if(S.limbo){b.remove();return;}
   const now=Date.now();advance(now);
   const hero=$('.hero').getBoundingClientRect(),r=b.getBoundingClientRect(),stage=S.stage;bump('orb');
   let txt;
@@ -645,7 +664,7 @@ function spawnOrb(){
   b.addEventListener('click',ev=>{ev.stopPropagation();collectOrb(b);});
   $('.hero').appendChild(b);setTimeout(()=>b.remove(),14000);
 }
-function doBoost(){act(now=>{if(now<S.boostAt||atWall())return;S.boostUntil=now+MIN;S.boostAt=now+8*MIN;bump('boost');});}
+function doBoost(){act(now=>{if(S.limbo||now<S.boostAt||atWall())return;S.boostUntil=now+MIN;S.boostAt=now+8*MIN;bump('boost');});}
 function doBreak(mod){
   act(now=>{
     if(!atWall())return;
@@ -654,9 +673,9 @@ function doBreak(mod){
     if(Math.random()<c){
       S.insight=0;S.stuck=false;bump('trial');
       if(final){
-        S.asc++;S.stage=0;S.xp=0;
-        log('九重雷劫尽数接下。你飞升而去，又带着一缕仙缘转世重修。','key',now);
-        sheet('<h3>渡劫飞升</h3><p>雷云散尽，天门洞开。你选择带着记忆重入轮回。</p><ul><li>仙缘 +1，修炼速度永久 +50%</li><li>功法、灵兽、灵石、行囊随身带走</li></ul>');
+        S.asc++;const n=enterLimbo(now,15);
+        log('九重雷劫尽数接下，天门洞开。你没有踏进去，转身入了轮回。此生结道果 '+n+' 枚。','key',now);
+        sheet('<h3>渡劫飞升</h3><p>雷云散尽，仙乐自天门里飘出来。你听了一会儿，转身走向轮回殿。</p><ul><li>仙缘 +1，修炼速度永久 +50%</li><li>结道果 '+n+' 枚，去轮回殿定下来世的天赋</li></ul>');
       }else{
         S.stage++;S.xp=0;
         log('冲关功成，自'+from+'踏入'+STAGES[S.stage].name+'。','key',now);
@@ -833,7 +852,9 @@ const ACHS=[
   {id:'yuanying',n:'元婴出窍',d:'修成元婴',r:'修炼 +6%',p:()=>[S.asc?99:S.stage,17],e:{rate:.06},flag:1},
   {id:'trial3',n:'心魔三渡',d:'渡过心魔劫 3 次',r:'冲关成算 +3%',p:()=>[stat('trial'),3],e:{brk:.03}},
   {id:'deep10',n:'深入不毛',d:'秘境到达第 10 层',r:'秘境气血 +30',p:()=>[stat('deep'),10],e:{hp:30}},
-  {id:'gear5',n:'琳琅满目',d:'累计获得法宝 5 件',r:'灵石收入 +5%',p:()=>[stat('gear'),5],e:{stone:.05}}
+  {id:'gear5',n:'琳琅满目',d:'累计获得法宝 5 件',r:'灵石收入 +5%',p:()=>[stat('gear'),5],e:{stone:.05}},
+  {id:'life1',n:'再世为人',d:'轮回 1 次',r:'修炼 +10%',p:()=>[stat('life'),1],e:{rate:.1}},
+  {id:'life5',n:'五世修行',d:'轮回 5 次',r:'修炼 +20%',p:()=>[stat('life'),5],e:{rate:.2}}
 ];
 function checkAch(now){
   let got=false;
@@ -932,7 +953,7 @@ function trialOk(c,now){
   return{ok:true,note:''};
 }
 function startTrial(){
-  const now=Date.now();advance(now);if(!atWall())return;
+  const now=Date.now();advance(now);if(S.limbo||!atWall())return;
   const pool=TRIALS.map((_,i)=>i),qs=[];
   while(qs.length<3)qs.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]);
   ui.trial={qs,i:0,mod:0,last:''};renderTrial();
@@ -961,6 +982,51 @@ function answerTrial(k){
   if(a.risk){const win=Math.random()<.5;T.mod+=win?.15:-.1;T.last=(win?a.win:a.lose)+'（成算 '+(win?'+15%':'−10%')+'）';}
   else{T.mod+=a.v;T.last=a.r+'（成算 +'+pct(a.v)+'）';}
   T.i++;renderTrial();
+}
+
+/* ---------- 轮回：道果换天赋，再入来世 ---------- */
+const fruitFor=s=>s>=13?s-11:0;
+function talBuy(id){act(()=>{const T=TALS[id],l=S.tal[id]||0;if(!T||l>=T.max)return;const c=T.c(l);if(S.fruit<c)return;S.fruit-=c;S.tal[id]=l+1;});}
+function enterLimbo(now,bonus){const n=fruitFor(S.stage)+(bonus||0);S.fruit+=n;S.limbo=true;S.limboGain=n;S.run=null;S.event=null;return n;}
+function startRebirth(){
+  act(now=>{
+    ui.confirmLun=false;if(S.limbo||fruitFor(S.stage)<1)return;
+    const from=STAGES[S.stage].name,n=enterLimbo(now,0);
+    log('你在'+from+'散去一身修为，自入轮回。此生结道果 '+n+' 枚。','key',now);
+  });
+}
+function doRebirth(){
+  act(now=>{
+    if(!S.limbo)return;
+    const keep=.15*S.tal.yi;
+    S.stones=Math.floor(S.stones*keep);S.contrib=Math.floor(S.contrib*keep);S.sectTotal=Math.floor(S.sectTotal*keep);S.pages=Math.floor(S.pages*keep);
+    for(const k of Object.keys(S.arts))S.arts[k]=Math.max(1,Math.round(S.arts[k]*keep));
+    S.inv.qi=1;S.inv.po=0;S.array=0;S.field=1;S.fieldAt=now;S.jobs=[];
+    S.teaUntil=0;S.boostUntil=0;S.boostAt=0;S.demonUntil=0;S.insight=0;S.stuck=false;S.event=null;S.outcome=null;S.run=null;S.lastRun=null;
+    S.stage=Math.min(8,2*S.tal.su);S.xp=0;S.root=rollRoot(S.tal.ling);S.luck=clamp(50+5*S.tal.fu,0,100);
+    S.fate=Math.max(S.fate,1);S.limbo=false;S.limboGain=0;S.life++;bump('life');S.ts=now;
+    log('第 '+S.life+' 世。你又一次站在山门前，测灵石亮起：'+S.root.el+'属'+GRADES[S.root.g].n+'。这一回，路是熟的。','key',now);
+    ui.tab='xiu';ui.seg='dong';
+    sheet('<h3>第 '+S.life+' 世</h3><p>一声啼哭，前尘渐远，只有几样东西跟了过来。</p><ul><li>灵根：'+S.root.el+'属'+GRADES[S.root.g].n+'</li><li>起步：'+STAGES[S.stage].name+'</li><li>悟性 '+S.tal.wu+' 级，修炼速度 +'+25*S.tal.wu+'%</li>'+(keep?'<li>遗泽留下了 '+Math.round(keep*100)+'% 的灵石、功法层数与宗门贡献</li>':'')+'</ul>');
+  });
+}
+function viewLun(now){
+  const gain=fruitFor(S.stage);
+  let h='<section class="sec"><h2>轮回<small>第 '+S.life+' 世 · 道果 '+S.fruit+'</small></h2>';
+  if(S.limbo){
+    h+='<article class="card"><h3>轮回殿</h3><p class="story">前尘已了，此生结出道果 '+S.limboGain+' 枚。先定来世的天赋，再去投胎。</p><div class="acts">'+btn('投胎转世','rebirth','','gold')+'</div></article>';
+  }else if(ui.confirmLun){
+    h+='<article class="card"><h3>当真要入轮回？</h3><p class="story">此刻散功，可得道果 '+gain+' 枚。</p><p class="hint">清去：境界修为、灵石、丹药、聚灵阵、灵田、功法层数、宗门贡献与身份'+(S.tal.yi?'（遗泽可留 '+15*S.tal.yi+'%）':'')+'。<br>带走：天赋、法宝、灵兽、功绩、日课与连续天数、已得的功法、口粮与秘境令。</p><div class="acts">'+btn('散功，入轮回','lunYes','','warn')+btn('再修一修','lunNo')+'</div></article>';
+  }else{
+    h+='<p class="hint">'+(gain?'此刻轮回可得道果 '+gain+' 枚。':'修到金丹方可轮回。')+'境界越高道果越多，大乘圆满渡劫飞升另加 15 枚。道果换来的天赋永久有效，一世比一世好走。</p>';
+    if(gain)h+='<div class="acts">'+btn('入轮回','lunAsk','','gold')+'</div>';
+  }
+  h+='</section><section class="sec"><h2>天赋</h2>';
+  for(const id of Object.keys(TALS)){
+    const T=TALS[id],l=S.tal[id]||0,max=l>=T.max,c=max?0:T.c(l);
+    h+=row(T.n+' · '+l+' 级',T.d(l)+' · '+T.step,max?'<span class="hint">已满</span>':btn('道果 '+c,'tal',' data-id="'+id+'"','pri',S.fruit<c));
+  }
+  return h+'</section>';
 }
 
 /* ---------- cloud save (per-viewer document) ---------- */
@@ -1074,7 +1140,7 @@ function liveKey(now){
 }
 function updateLive(now){
   const st=STAGES[S.stage],need=req(S.stage),full=atWall(),b=branchIdx(now);
-  $('#realm').textContent=st.name;$('#seal').textContent=S.root.el;
+  $('#realm').textContent=S.limbo?'轮回之中':st.name;$('#seal').textContent=S.root.el;
   $('#daoName').textContent=S.name;$('#hourName').textContent=BRANCH[b]+'时 · '+BRANCH_ALIAS[b];
   $('#stones').textContent=fmt(S.stones);
   $('#tapHint').textContent='点山水吐纳 · 周天 '+S.cycle+' / 9';
@@ -1083,7 +1149,8 @@ function updateLive(now){
   $('#bar').style.width=clamp(S.xp/need*100,0,100).toFixed(2)+'%';
   $('#barWrap').classList.toggle('full',full);
   const brk=$('#breakBtn'),boost=$('#boostBtn'),note=$('#note');
-  if(full){
+  if(S.limbo){brk.hidden=true;boost.hidden=true;note.textContent='前尘已了，待入来世';$('#rate').textContent='入定';}
+  else if(full){
     const {c,pills}=breakOdds(now),final=S.stage===STAGES.length-1;
     brk.hidden=false;boost.hidden=true;brk.textContent=(final?'渡劫飞升':'渡心魔劫')+' · 成算 '+Math.round(c*100)+'% 起';
     note.textContent=pills?'将服破境丹 '+pills+' 枚':(now<S.demonUntil?'心魔在侧，成算减两成':'破境丹、道心可添成算');
@@ -1236,7 +1303,7 @@ function viewZong(now){
   return h+'<p class="hint">差事派出去便自行办理，离开也照常计时，办妥后回来交差。</p></section>';
 }
 function viewFu(now){
-  let h=segBar('seg',[['dong','洞天'],['gong','功法'],['bao','法宝'],['shou','灵兽'],['shi','坊市']],ui.seg);
+  let h=segBar('seg',[['dong','洞天'],['gong','功法'],['bao','法宝'],['shou','灵兽'],['shi','坊市'],['lun','轮回']],ui.seg);
   if(ui.seg==='gong'){
     h+='<section class="sec"><h2>功法<small>残页 '+S.pages+'</small></h2>';
     for(const id of Object.keys(ARTS)){
@@ -1268,6 +1335,8 @@ function viewFu(now){
         (on?'':btn('随行','setPet',' data-id="'+id+'"'))+(p.lv>=PET_MAX?'':btn('喂食','feed',' data-id="'+id+'"','pri',S.inv.food<1))+'</div></div>';
     }
     h+='<p class="hint">只有随行的那只生效，随时可换。共五种：白狐添气运，青鸾助修炼，寻宝鼠聚灵石，玄龟稳冲关，赤焰虎壮吐纳。</p></section>';
+  }else if(ui.seg==='lun'){
+    h+=viewLun(now);
   }else if(ui.seg==='shi'){
     h+='<section class="sec"><h2>坊市<small>灵石 '+fmt(S.stones)+'</small></h2>';
     for(const it of shopList(now)){
@@ -1298,11 +1367,11 @@ function viewFu(now){
 }
 function renderPanel(){
   const now=Date.now();
-  $('#panel').innerHTML=({xiu:viewXiu,ke:viewKe,yuan:viewYuan,zong:viewZong,fu:viewFu})[ui.tab](now);
+  $('#panel').innerHTML=S.limbo?viewLun(now):({xiu:viewXiu,ke:viewKe,yuan:viewYuan,zong:viewZong,fu:viewFu})[ui.tab](now);
   ui.liveKey=liveKey(now);
 }
 function render(){renderPanel();updateLive(Date.now());}
-function setTab(t){ui.tab=t;ui.editHabits=false;ui.draft=null;ui.editName=false;ui.confirmReset=false;render();$('#panel').scrollTop=0;}
+function setTab(t){ui.tab=t;ui.editHabits=false;ui.draft=null;ui.editName=false;ui.confirmReset=false;ui.confirmLun=false;render();$('#panel').scrollTop=0;}
 function readHabitInputs(){
   ui.draft.forEach((x,i)=>{const n=$('#hn'+i),d=$('#hd'+i);if(n&&n.value.trim())x.name=n.value.trim().slice(0,6);if(d)x.desc=d.value.trim().slice(0,30);});
 }
@@ -1324,6 +1393,11 @@ function wire(){
     const b=e.target.closest('[data-act]');if(!b||b.disabled)return;const a=b.dataset.act,d=b.dataset;
     if(a==='tab')setTab(d.tab);
     else if(a==='seg'){ui[d.grp]=d.seg;ui.editName=false;ui.confirmReset=false;renderPanel();$('#panel').scrollTop=0;}
+    else if(a==='lunAsk'){ui.confirmLun=true;renderPanel();}
+    else if(a==='lunNo'){ui.confirmLun=false;renderPanel();}
+    else if(a==='lunYes')startRebirth();
+    else if(a==='rebirth')doRebirth();
+    else if(a==='tal')talBuy(d.id);
     else if(a==='bounty')claimBounty(+d.i);
     else if(a==='dgEnter')enterRun();
     else if(a==='dgDoor')openDoor(+d.i);
@@ -1375,7 +1449,7 @@ function tick(){
   if(now-lastAmbient>5*MIN&&!S.stuck){lastAmbient=now;log(pick(AMBIENT),'',now);dirty=dirty||ui.tab==='xiu';}
   if(dirty&&!editing())renderPanel();
   updateLive(now);
-  if(!document.hidden&&now>=nextOrb){nextOrb=now+25000+Math.random()*20000;if(document.querySelectorAll('.orb').length<2)spawnOrb();}
+  if(!document.hidden&&!S.limbo&&now>=nextOrb){nextOrb=now+25000+Math.random()*20000;if(document.querySelectorAll('.orb').length<2)spawnOrb();}
   if(now-lastLocal>15000){lastLocal=now;saveLocal();}
 }
 function start(hot){
