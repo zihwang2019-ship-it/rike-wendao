@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>日课问道</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=ZCOOL+XiaoWei&family=Noto+Serif+SC:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Layout: a hanging scroll. The painting sits on top with a vertical inscription and a seal;
+     the ledger of the day scrolls beneath it; a rail of four tabs closes the bottom.
+     Palette follows the real clock: mineral pigments on indigo at night, on aged silk by day. */
+  --bg:#0e1b29; --surface:#15283a; --line:#2b4459; --ink:#ebe3cf; --muted:#93a4ae;
+  --azurite:#4a93c4; --malachite:#45ab8f; --gold:#d6ad55; --cinnabar:#d65f44; --on-accent:#0d1924;
+  --sky1:#091420; --sky2:#1a3350; --m1:#234c6b; --m2:#1c5b72; --m3:#1b6a5d; --m4:#0f3540;
+  --f-brush:"Ma Shan Zheng","STKaiti","KaiTi","Kaiti SC",cursive;
+  --f-head:"ZCOOL XiaoWei","Songti SC","STSong","Noto Serif CJK SC",serif;
+  --f-body:"Noto Serif SC","Songti SC","STSong","Noto Serif CJK SC","SimSun",serif;
+  color-scheme:dark;
+}
+:root[data-phase="day"]{
+  --bg:#dbcfae; --surface:#e8dec3; --line:#bdab80; --ink:#1c2a31; --muted:#566360;
+  --azurite:#1f5f8b; --malachite:#1d6352; --gold:#775711; --cinnabar:#a53d28; --on-accent:#f4eedc;
+  --sky1:#e9dfc4; --sky2:#d6c8a0; --m1:#86a8b8; --m2:#3f7f9c; --m3:#2f8271; --m4:#1f5a55;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.7;
+  display:flex;justify-content:center;-webkit-text-size-adjust:100%;transition:background-color .8s,color .8s}
+#app{width:100%;max-width:480px;height:100%;display:flex;flex-direction:column;position:relative}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+h1,h2,h3,p,ol,ul,dl,dd{margin:0;padding:0}
+ol,ul{list-style:none}
+
+/* painting */
+.hero{position:relative;flex:none;height:clamp(216px,31vh,260px);overflow:hidden}
+#scene{display:block;width:100%;height:100%}
+.inscr{position:absolute;top:14px;left:16px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.inscr h1{writing-mode:vertical-rl;font-family:var(--f-brush);font-weight:400;font-size:40px;line-height:1;
+  letter-spacing:.06em;text-shadow:0 0 14px var(--sky1),0 0 4px var(--sky1)}
+.seal{width:26px;height:26px;display:grid;place-items:center;background:var(--cinnabar);color:#f6ead6;
+  font-family:var(--f-head);font-size:16px;line-height:1;border-radius:3px;transform:rotate(-3deg)}
+.colophon{position:absolute;top:14px;right:16px;text-align:right;font-family:var(--f-head);line-height:1.5;
+  text-shadow:0 0 10px var(--sky1),0 0 3px var(--sky1)}
+.colophon .dao{font-size:17px}
+.colophon .hour{font-size:13px;color:var(--muted)}
+.colophon .stones{font-size:13px;font-variant-numeric:tabular-nums}
+.colophon .stones b{font-weight:400;color:var(--gold)}
+
+/* cultivation gauge */
+.gauge{flex:none;padding:10px 16px 12px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:7px}
+.gauge-row{display:flex;justify-content:space-between;align-items:center;gap:12px;font-variant-numeric:tabular-nums}
+.gauge-row .xp{font-family:var(--f-head);font-size:15px}
+.gauge-row .xp b{font-weight:400;font-size:19px}
+.gauge-row .rate{font-size:13px;color:var(--malachite)}
+.bar{height:7px;border:1px solid var(--line);border-radius:4px;overflow:hidden;
+  background:repeating-linear-gradient(90deg,transparent 0,transparent calc(25% - 1px),var(--line) calc(25% - 1px),var(--line) 25%)}
+.bar i{display:block;height:100%;width:0;background:var(--malachite);transition:width .9s linear}
+.bar.full i{background:var(--gold)}
+.note{font-size:12.5px;color:var(--muted);min-height:34px;display:flex;align-items:center}
+
+/* controls */
+.btn{border:1px solid var(--line);background:transparent;border-radius:6px;padding:7px 14px;font-family:var(--f-head);
+  font-size:14px;line-height:1.3;white-space:nowrap;min-height:34px}
+.btn.pri{background:var(--azurite);border-color:var(--azurite);color:var(--on-accent)}
+.btn.gold{background:var(--gold);border-color:var(--gold);color:var(--on-accent)}
+.btn.warn{border-color:var(--cinnabar);color:var(--cinnabar)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.gold.pulse{animation:pulse 2.2s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--gold) 22%,transparent)}}
+input[type=text]{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 9px;min-width:0;width:100%}
+
+/* ledger */
+#panel{flex:1;overflow-y:auto;padding:14px 16px 22px;display:flex;flex-direction:column;gap:16px}
+h2{font-family:var(--f-head);font-weight:400;font-size:17px;letter-spacing:.08em;display:flex;align-items:baseline;gap:10px}
+h2 small{font-family:var(--f-body);font-size:12.5px;color:var(--muted);letter-spacing:0;font-variant-numeric:tabular-nums}
+.sec{display:flex;flex-direction:column;gap:10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12.5px;padding:1px 9px;border:1px solid var(--line);border-radius:999px;font-variant-numeric:tabular-nums}
+.chip.up{border-color:var(--malachite);color:var(--malachite)}
+.chip.down{border-color:var(--cinnabar);color:var(--cinnabar)}
+.callout{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 12px;
+  border:1px solid var(--gold);border-radius:8px;font-size:14px}
+.log{display:flex;flex-direction:column}
+.log li{display:grid;grid-template-columns:5.4em 1fr;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line)}
+.log time{font-size:12px;color:var(--muted);padding-top:3px;font-variant-numeric:tabular-nums}
+.log p{font-size:14.5px}
+.log li.key p{color:var(--gold)}
+.log li.bad p{color:var(--cinnabar)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.card h3{font-family:var(--f-head);font-weight:400;font-size:19px;letter-spacing:.06em}
+.card .story{font-size:15px;line-height:1.85}
+.card .picked{font-size:13px;color:var(--muted)}
+.choices{display:flex;flex-direction:column;gap:8px}
+.choice{text-align:left;border:1px solid var(--line);background:transparent;border-radius:8px;padding:9px 12px;
+  display:flex;flex-direction:column;gap:1px;line-height:1.5}
+.choice:not(:disabled):active{background:color-mix(in srgb,var(--azurite) 18%,transparent)}
+.choice span{font-size:15px}
+.choice small{font-size:12px;color:var(--muted)}
+.choice:disabled{opacity:.5;cursor:not-allowed}
+.gains{display:flex;flex-wrap:wrap;gap:6px}
+.empty{color:var(--muted);font-size:14px}
+
+.habits{display:flex;flex-direction:column}
+.habit{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px dashed var(--line)}
+.habit .txt{display:flex;flex-direction:column;min-width:0;line-height:1.45}
+.habit b{font-family:var(--f-head);font-weight:400;font-size:17px}
+.habit span{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.habit .mark{width:34px;height:34px;display:grid;place-items:center;background:var(--cinnabar);color:#f6ead6;
+  font-family:var(--f-head);border-radius:4px;transform:rotate(-4deg);flex:none}
+.habit.edit{display:grid;grid-template-columns:5.5em 1fr auto;gap:8px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 0;border-bottom:1px dashed var(--line)}
+.row .txt{display:flex;flex-direction:column;min-width:0;line-height:1.45}
+.row b{font-weight:400;font-family:var(--f-head);font-size:16px;font-variant-numeric:tabular-nums}
+.row span{font-size:12.5px;color:var(--muted)}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.hint{font-size:12.5px;color:var(--muted)}
+
+/* tab rail */
+.tabs{flex:none;display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line);background:var(--bg)}
+.tabs button{border:0;background:transparent;padding:9px 4px 11px;font-family:var(--f-head);font-size:16px;letter-spacing:.1em;
+  color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:0;line-height:1.3;border-top:2px solid transparent;margin-top:-1px}
+.tabs button[aria-selected=true]{color:var(--ink);border-top-color:var(--gold)}
+.tabs small{font-family:var(--f-body);font-size:11px;letter-spacing:0;font-variant-numeric:tabular-nums;min-height:1.3em}
+.tabs small.hot{color:var(--gold)}
+
+/* sheet */
+#sheet{position:absolute;inset:0;background:rgba(5,10,16,.55);display:flex;align-items:flex-end;z-index:5}
+#sheet[hidden]{display:none}
+.sheet-body{width:100%;background:var(--bg);border-top:1px solid var(--gold);border-radius:14px 14px 0 0;padding:20px 18px 22px;
+  display:flex;flex-direction:column;gap:12px;animation:rise .28s ease-out}
+.sheet-body h3{font-family:var(--f-brush);font-weight:400;font-size:32px;line-height:1.2}
+.sheet-body ul{display:flex;flex-direction:column;gap:2px;font-size:15px;font-variant-numeric:tabular-nums}
+@keyframes rise{from{transform:translateY(24px);opacity:.4}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="hero">
+    <canvas id="scene" aria-hidden="true"></canvas>
+    <div class="inscr"><h1 id="realm">炼气一层</h1><span class="seal" id="seal" title="灵根">火</span></div>
+    <div class="colophon">
+      <div class="dao" id="daoName"></div>
+      <div class="hour" id="hourName"></div>
+      <div class="stones">灵石 <b id="stones">0</b></div>
+    </div>
+  </header>
+  <section class="gauge" aria-label="修为">
+    <div class="gauge-row">
+      <span class="xp">修为 <b id="xpNow">0</b> / <span id="xpReq">0</span></span>
+      <span class="rate" id="rate"></span>
+    </div>
+    <div class="bar" id="barWrap"><i id="bar"></i></div>
+    <div class="gauge-row">
+      <span class="note" id="note"></span>
+      <button class="btn gold pulse" id="breakBtn" type="button" hidden></button>
+    </div>
+  </section>
+  <main id="panel"></main>
+  <nav class="tabs" role="tablist" aria-label="页签">
+    <button type="button" role="tab" data-tab="xiu">修行<small id="tXiu"></small></button>
+    <button type="button" role="tab" data-tab="ke">日课<small id="tKe"></small></button>
+    <button type="button" role="tab" data-tab="yuan">机缘<small id="tYuan"></small></button>
+    <button type="button" role="tab" data-tab="fu">洞府<small id="tFu"></small></button>
+  </nav>
+  <div id="sheet" hidden role="dialog" aria-modal="true"><div class="sheet-body" id="sheetBody"></div></div>
+</div>
+
+<script>
+(function(){
+'use strict';
+/* ---------- constants ---------- */
+const V=1, LS_KEY='rike-wendao-v1';
+const MIN=60e3, HOUR=3600e3, DAY=24*HOUR, FATE_INT=30*MIN, FATE_CAP=3, FATE_MAX=6;
+const BRANCH=['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+const BRANCH_ALIAS=['夜半','鸡鸣','平旦','日出','食时','隅中','日中','日昳','晡时','日入','黄昏','人定'];
+const CARDINAL=[0,3,6,9]; // 子午卯酉，四正时
+const ROOTS={
+  '金':{br:[8,9],bonus:.25,when:'申酉二时'},
+  '木':{br:[2,3],bonus:.25,when:'寅卯二时'},
+  '水':{br:[11,0],bonus:.25,when:'亥子二时'},
+  '火':{br:[5,6],bonus:.25,when:'巳午二时'},
+  '土':{br:[1,4,7,10],bonus:.12,when:'辰戌丑未四时'}
+};
+const GRADES=[{n:'杂灵根',m:1,w:50},{n:'真灵根',m:1.15,w:35},{n:'天灵根',m:1.35,w:13},{n:'变异灵根',m:1.6,w:2}];
+const REALMS=['炼气','筑基','金丹','元婴','化神','炼虚','合体','大乘'];
+const STAGES=[];
+REALMS.forEach((r,ri)=>{
+  const subs=ri===0?['一层','二层','三层','四层','五层','六层','七层','八层','九层']:['初期','中期','后期','圆满'];
+  subs.forEach((s,si)=>STAGES.push({name:r+s,ri,last:si===subs.length-1}));
+});
+const DEFAULT_HABITS=[
+  {id:'h1',name:'炼体',desc:'运动 30 分钟'},
+  {id:'h2',name:'悟道',desc:'读书或学习 30 分钟'},
+  {id:'h3',name:'入世',desc:'做完今天最要紧的一件事'},
+  {id:'h4',name:'静心',desc:'冥想或放空 10 分钟'}
+];
+const AMBIENT=['山风过耳，你运转完一个周天。','檐角滴水，一息一数，数到后来忘了数。','远处有人练剑，剑鸣断断续续。',
+  '香炉里的灰又积了一层。','一只山雀落在窗台，看了你一会儿，飞走了。','丹田微热，灵气如溪水缓缓汇入。'];
+
+/* ---------- 机缘 ---------- */
+const EVENTS=[
+{id:'canhun',t:'洞中残魂',x:'山雨骤至，你躲进一处石洞。石壁后透出微光，一缕残魂缓缓凝形，自称三千年前的金丹修士：“小友，我以毕生所学，换你一个承诺。”',c:[
+  {l:'应下承诺，听他讲道',o:[{w:7,g:1,x:'残魂大笑，一指点在你眉心。半卷功法烙入识海，他却始终没说那承诺是什么。',fx:{page:1,xp:20}},{w:3,g:-1,x:'讲到一半，残魂忽然扑来，欲行夺舍。你拼力将其震散，神识却已受创。',fx:{demon:30}}]},
+  {l:'恭敬一拜，转身离去',o:[{w:1,x:'你退出石洞，雨恰好停了。不取无名之物，心里反倒踏实。',fx:{luck:3,xp:5}}]},
+  {l:'以道心镇之，先问来历',need:2,o:[{w:1,x:'你神色不动。残魂打量你许久，叹道：“今日已行过功课的人，骗不得。”遂倾囊相授。',fx:{page:2,xp:30}}]}]},
+{id:'hulu',t:'坊市旧葫芦',x:'坊市尽头的地摊上，一只蒙尘的旧葫芦压在杂物底下。摊主眼皮都不抬：“祖传的，不讲价。”',c:[
+  {l:'照价买下',cost:30,o:[{w:5,g:1,x:'回去一摇，葫芦里滚出两枚丹药，药香未散。',fx:{qi:2}},{w:3,x:'葫芦是空的，倒是可以拿来装水。',fx:{}},{w:2,g:1,x:'葫芦底嵌着一枚破境丹，不知是哪位前辈的私藏。',fx:{po:1}}]},
+  {l:'蹲下来慢慢讲价',o:[{w:5,g:1,x:'磨了半个时辰，摊主烦不胜烦，半卖半送。葫芦里有一枚聚气丹。',fx:{qi:1}},{w:5,g:-1,x:'摊主一把收起葫芦：“不卖了。”',fx:{}}]},
+  {l:'看看就走',o:[{w:1,x:'你起身离开。身后立刻有人蹲了下去。',fx:{luck:1}}]}]},
+{id:'lingquan',t:'林中灵泉',x:'密林深处有一眼灵泉，灵气氤氲。泉边卧着一头酣睡的青鳞兽，鼻息如雷。',c:[
+  {l:'屏息上前取水',o:[{w:6,g:1,x:'你舀了满满一壶，青鳞兽只翻了个身。泉水入腹，经脉一阵清凉。',fx:{xp:45}},{w:4,g:-1,x:'壶沿磕到石头，青鳞兽猛然睁眼。你一路狂奔下山，许久心神难定。',fx:{demon:25}}]},
+  {l:'远远守着，等它离开',o:[{w:1,x:'日头偏西，青鳞兽才慢悠悠走了。泉水所剩不多，聊胜于无。',fx:{xp:15}}]}]},
+{id:'shidi',t:'师弟借灵石',x:'同门师弟红着眼找上门：筑基丹只差最后一味药引，想借些灵石，“丹成之后必有重谢”。',c:[
+  {l:'借给他',cost:20,o:[{w:7,g:1,x:'三日后师弟满面春风，塞给你一枚破境丹：“师兄，多炼了一炉。”',fx:{po:1}},{w:3,x:'炉炸了。师弟灰头土脸来赔罪，你摆摆手。这份情他会记着。',fx:{luck:5}}]},
+  {l:'婉言谢绝',o:[{w:1,x:'师弟点点头走了。你继续打坐，却静不太下来。',fx:{xp:5}}]}]},
+{id:'xinghe',t:'星河低垂',x:'今夜无云，星河低得像要落进山谷。你隐约觉得，天象在说些什么。',c:[
+  {l:'静坐观星',o:[{w:8.5,x:'你看了一整夜，什么也没参透，气息却比平日绵长。',fx:{xp:25}},{w:1.5,g:1,x:'某颗星闪了三下，你脑中轰然一响，困扰多日的关窍豁然贯通。',fx:{xp:90}}]},
+  {l:'推演自己的气运',o:[{w:6,g:1,x:'卦象显示：近日宜出门，宜动手，宜把拖着的事做完。',fx:{luck:5}},{w:4,g:-1,x:'卦象一片混沌，你越算越乱，索性作罢。',fx:{luck:-3}}]}]},
+{id:'tanshe',t:'贪舍两门',x:'一座古修洞府，禁制早已残破。甬道尽头两扇石门，一扇刻着“贪”，一扇刻着“舍”。',c:[
+  {l:'推开贪门',o:[{w:5,g:1,x:'满室灵石，无人看守。你装满了袖袋，石门在身后缓缓合上。',fx:{stone:120}},{w:5,g:-1,x:'门后是一座幻阵。你在金山银海里转了不知多久，出来时两手空空，心绪翻涌。',fx:{demon:45}}]},
+  {l:'推开舍门，留下灵石为礼',cost:40,o:[{w:1,x:'石室空空，只有一方石台。你放下灵石，台上浮出两页功法，墨迹如新。',fx:{page:2,xp:30}}]}]},
+{id:'huanxiang',t:'入定幻象',x:'入定之时，眼前浮出一个与你一模一样的人，懒洋洋开口：“今天那件事，明天再做也一样。”',c:[
+  {l:'“今日的，已经做了。”',need:1,o:[{w:1,x:'幻象一怔，随即散作青烟。你心头一片澄明。',fx:{xp:60,luck:3}}]},
+  {l:'与它辩个明白',o:[{w:6,g:1,x:'你一条条驳回去，幻象哑口无言。',fx:{xp:20}},{w:4,g:-1,x:'它句句在理，你竟无言以对。出定之后，杂念丛生。',fx:{demon:30}}]},
+  {l:'点头称是',o:[{w:1,x:'幻象满意地笑了，递来几块灵石，像是定金。你隐约觉得亏了。',fx:{stone:10,demon:60}}]}]},
+{id:'baihu',t:'受伤的白狐',x:'山道旁蜷着一只小白狐，后腿有伤，见了你也不逃，只是看着。',c:[
+  {l:'买药替它治伤',cost:25,o:[{w:1,x:'白狐舔了舔你的手，跛着脚钻进草丛。翌日清晨，门前多了一株带露的灵草。',fx:{luck:8,qi:1}}]},
+  {l:'留些干粮，继续赶路',o:[{w:1,x:'你走出很远回头，它还在原地望着。',fx:{luck:1}}]}]},
+{id:'lundao',t:'道旁论道',x:'两位修士在道旁争得面红耳赤，一个说道在深山，一个说道在尘世。见你路过，齐声道：“你来评评。”',c:[
+  {l:'以今日所行为证',need:1,o:[{w:1,x:'你说起今天做完的那件事。二人沉默片刻，各自拱手：“受教。”其中一人留下一页手札。',fx:{xp:55,page:1}}]},
+  {l:'各打五十大板',o:[{w:1,x:'你说了些两边都不得罪的话。二人觉得无趣，接着吵去了。',fx:{xp:10}}]},
+  {l:'旁听不语',o:[{w:1,x:'你听了半日，两边的道理都记下了一些。',fx:{xp:20}}]}]},
+{id:'leiyu',t:'雷雨之夜',x:'子夜雷声大作，电光把群山照得雪亮。体修都说雷雨是淬体的良机，也有人就此没再下山。',c:[
+  {l:'登上山顶，引雷淬体',o:[{w:4.5,g:1,x:'一道细雷擦身而过，你浑身酥麻，筋骨却像被洗过一遍。',fx:{xp:80}},{w:5.5,g:-1,x:'雷音贯耳，你眼前一黑。醒来已在山腰，耳中嗡鸣不止。',fx:{demon:40}}]},
+  {l:'在屋里听雷',o:[{w:1,x:'你数着雷声入定，一夜安稳。',fx:{xp:20}}]}]},
+{id:'lingzhi',t:'崖上灵芝',x:'百丈崖壁上长着一株灵芝，伞盖泛紫，少说三百年。崖下云雾翻涌，看不见底。',c:[
+  {l:'攀崖去采',o:[{w:6,g:1,x:'你手脚并用爬了上去。灵芝到手，回去炼成两枚聚气丹。',fx:{qi:2}},{w:4,g:-1,x:'岩石松动，你摔进半山的树丛。人没事，钱袋不知掉去了哪里。',fx:{stone:-15}}]},
+  {l:'记下位置，改日再来',o:[{w:1,x:'你在崖下刻了个记号。有些东西不急于一时。',fx:{luck:2}}]}]},
+{id:'mifa',t:'筑基秘法',x:'茶肆角落，一个斗笠人压低声音：“前辈遗物，筑基秘法，只此一份。”',c:[
+  {l:'掏灵石买下',cost:60,o:[{w:3.5,g:1,x:'竟是真货。匣中一枚破境丹，另有一页批注。',fx:{po:1,page:1}},{w:6.5,g:-1,x:'回去拆开一看，是《引气入门》的手抄本，还抄错了三处。',fx:{luck:-2}}]},
+  {l:'喝完茶就走',o:[{w:1,x:'你放下茶钱。斗笠人已经在向邻桌兜售同一个匣子了。',fx:{luck:1}}]}]},
+{id:'chaishi',t:'师门差事',x:'掌事长老翻着名册：“看守药园、押送灵材、藏经阁抄经，你挑一样。”',c:[
+  {l:'看守药园',o:[{w:1,x:'一日无事。你数清了园里一共有多少株凝露草。',fx:{stone:35}}]},
+  {l:'押送灵材',o:[{w:6.5,g:1,x:'一路顺遂，货主多给了赏钱。',fx:{stone:80}},{w:3.5,g:-1,x:'半道遇上劫修。你护住了货，赔进去自己的盘缠。',fx:{stone:-20}}]},
+  {l:'藏经阁抄经',o:[{w:1,x:'抄到第三卷时，有几句话你停下来读了很多遍。',fx:{xp:30}}]}]},
+{id:'canju',t:'石桌残局',x:'松下石桌，一位老者独对残局，头也不抬：“小友，替黑棋落一子。”',c:[
+  {l:'落子天元',o:[{w:5,g:1,x:'老者抚掌大笑：“不拘一格，好。”他袖子一拂，一股暖流没入你的丹田。',fx:{xp:70}},{w:5,g:-1,x:'老者摇头：“花哨。”收了棋盘，飘然而去。',fx:{xp:10}}]},
+  {l:'观棋不语',o:[{w:1,x:'你站着看完了整盘棋。老者临走时朝你点了点头。',fx:{xp:20,luck:2}}]}]},
+{id:'liuhuo',t:'流火坠野',x:'夜半一道流火划过天际，坠入后山，隐隐有金铁之声。',c:[
+  {l:'即刻去寻',o:[{w:4,g:1,x:'坑底一块陨铁尚有余温，坊市的铁匠出了高价。',fx:{stone:100}},{w:3,g:1,x:'陨坑里什么都没有，坑壁上却露出半页前人埋下的功法。',fx:{page:1}},{w:3,g:-1,x:'赶到时已围了十几个人，你连坑边都没挤进去。',fx:{}}]},
+  {l:'不凑这个热闹',o:[{w:1,x:'你翻了个身接着打坐。第二天听说后山打了一夜。',fx:{xp:10}}]}]},
+{id:'baidu',t:'渡口摆渡人',x:'渡口只有一条船。摆渡人说：“不收灵石，只问一句。你今日，可曾辜负光阴？”',c:[
+  {l:'“未曾。”',need:1,o:[{w:1,x:'摆渡人看了你一眼，撑篙离岸。船到对岸时，你发觉丹田比上船前充盈了许多。',fx:{xp:45,luck:4}}]},
+  {l:'“尚有亏欠。”',o:[{w:1,x:'摆渡人点头：“知道亏欠的，可以渡。”',fx:{xp:20}}]},
+  {l:'沉默不答',o:[{w:1,x:'船还是开了，只是一路无话。',fx:{xp:5}}]}]},
+{id:'luhuo',t:'炉火转青',x:'炼到紧要处，炉火忽然由赤转青。丹书上说这是异变，没说是吉是凶。',c:[
+  {l:'加大火力，赌一把',o:[{w:5,g:1,x:'炉盖掀开，一枚破境丹滴溜溜打转。',fx:{po:1}},{w:5,g:-1,x:'轰的一声，炉子裂了。修炉的钱不便宜。',fx:{stone:-15}}]},
+  {l:'收火保丹',o:[{w:1,x:'你稳稳收了火，得了一枚寻常的聚气丹。',fx:{qi:1}}]}]},
+{id:'laixin',t:'故人来信',x:'凡俗的故友托人捎来一封信，说了些家长里短，末尾问：“你去修仙，到底求的是什么？”',c:[
+  {l:'提笔回信',o:[{w:1,x:'你写了很久，写完才发现是写给自己的。搁笔时，心中再无滞碍。',fx:{xp:20,clear:1}}]},
+  {l:'先放着，日后再回',o:[{w:1,x:'信压在蒲团底下，偶尔硌你一下。',fx:{xp:10}}]}]},
+{id:'mijing',t:'小秘境开启',x:'百年一开的小秘境三日后开启，宗门只有五个名额，报名要缴一笔灵石。',c:[
+  {l:'缴灵石，争名额',cost:50,o:[{w:6,g:1,x:'你抢到了名额，在秘境里寻到一处灵眼，足足坐了三天。',fx:{xp:120,stone:60}},{w:4,x:'名额到手，秘境里却被人抢先一步，只捡了些边角。',fx:{xp:40}}]},
+  {l:'把机会让给同门',o:[{w:1,x:'师姐拿到了最后一个名额，临行前郑重向你道谢。',fx:{luck:6}}]}]},
+{id:'gujing',t:'阁中古镜',x:'藏宝阁的角落立着一面古镜，据说能照见十年后的自己。',c:[
+  {l:'走近细看',o:[{w:5,g:1,x:'镜中人立于峰顶，回头冲你笑了一下。',fx:{xp:40}},{w:5,g:-1,x:'镜中人伏案昏睡，四周积着厚厚的灰。你退了半步，心里发紧。',fx:{demon:20,luck:3}}]},
+  {l:'把镜子扣过去',o:[{w:1,x:'十年后的事，十年后再看。',fx:{xp:10}}]}]}
+];
+const EV=Object.fromEntries(EVENTS.map(e=>[e.id,e]));
+
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const pad=n=>String(n).padStart(2,'0');
+function fmt(n){n=Math.floor(n);if(n>=1e8)return(n/1e8).toFixed(2)+' 亿';if(n>=1e4)return(n/1e4).toFixed(2)+' 万';return n.toLocaleString('en-US');}
+function fmtRate(r){return r>=100?fmt(r):r.toFixed(1);}
+function fmtClock(ms){const s=Math.max(0,Math.ceil(ms/1000));return pad(Math.floor(s/60))+':'+pad(s%60);}
+function dayKey(t){const d=new Date(t);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function nextMidnight(t){const d=new Date(t);d.setHours(24,0,0,0);return d.getTime();}
+function branchIdx(t){return Math.floor(((new Date(t).getHours()+1)%24)/2);}
+function nextBranch(t){const d=new Date(t),h=d.getHours();d.setHours(h%2===1?h+2:h+1,0,0,0);return d.getTime();}
+function isDay(t){const h=new Date(t).getHours();return h>=5&&h<19;}
+const req=i=>Math.round(60*Math.pow(1.625,i));
+const sc=()=>1+.3*S.stage;
+const price=n=>Math.round(n*sc());
+
+/* ---------- state ---------- */
+let S=null, fresh=false, loadedSavedAt=0;
+const ui={tab:'xiu',editHabits:false,draft:null,editName:false,confirmReset:false};
+const cloud={ref:null,ready:false,busy:false,dirty:false,state:'local'};
+
+function newGame(now){
+  let roll=Math.random()*100,g=0;for(let i=0;i<GRADES.length;i++){if(roll<GRADES[i].w){g=i;break;}roll-=GRADES[i].w;}
+  const el=pick(Object.keys(ROOTS));
+  const name=pick(['玄','清','云','守','怀','归','明','青','太','凌'])+pick(['尘','虚','拙','朴','真','岳','川','鹤','微','一'])+'子';
+  const s={v:V,created:now,savedAt:0,ts:now,name,root:{el,g},stage:0,xp:0,stones:30,luck:50,
+    array:0,art:0,pages:0,asc:0,insight:0,inv:{qi:1,po:0},
+    fate:1,fateAt:now+FATE_INT,event:null,outcome:null,recent:[],
+    habits:DEFAULT_HABITS.map(h=>({...h})),done:{day:dayKey(now),ids:[]},dailyCount:0,dailyUntil:0,
+    streak:0,lastDoneDay:'',streakUntil:0,demonUntil:0,stuck:false,log:[]};
+  const push=(x,k)=>s.log.unshift({t:now,x,k});
+  push('你在山门前站了很久，终于迈过那道门槛。测灵石亮起：'+el+'属'+GRADES[g].n+'。','key');
+  push('师父只留下一句话：山中打坐是修行，尘世日课也是修行。');
+  push('小境界水到渠成，大境界需亲手冲关。每日功课记在日课里，做完一项，机缘便多一道。');
+  return s;
+}
+const valid=o=>o&&o.v===V&&typeof o.ts==='number'&&Array.isArray(o.habits)&&o.root&&o.inv&&o.done;
+function loadLocal(){try{return JSON.parse(localStorage.getItem(LS_KEY));}catch(e){return null;}}
+function saveLocal(){try{localStorage.setItem(LS_KEY,JSON.stringify(S));}catch(e){}}
+function log(x,k,t){S.log.unshift({t:t||Date.now(),x,k:k||''});if(S.log.length>60)S.log.length=60;}
+
+/* ---------- cultivation maths ---------- */
+function streakNow(t){return t<S.streakUntil?S.streak:0;}
+function bonuses(t){
+  const b=branchIdx(t),out=[],root=ROOTS[S.root.el];
+  if(CARDINAL.includes(b))out.push({l:BRANCH[b]+'时四正',v:.25});
+  if(root.br.includes(b))out.push({l:S.root.el+'灵根应时',v:root.bonus});
+  if(t<S.dailyUntil&&S.dailyCount)out.push({l:'今日日课 '+S.dailyCount+' 项',v:.1*S.dailyCount});
+  const st=streakNow(t);if(st)out.push({l:'道心 · 连续 '+st+' 日',v:Math.min(st,20)*.03});
+  return out;
+}
+function rateAt(t){
+  const add=bonuses(t).reduce((a,x)=>a+x.v,0);
+  let r=Math.pow(1.3,S.stage)*GRADES[S.root.g].m*(1+.15*S.array)*(1+.12*S.art)*(1+.5*S.asc)*(1+add);
+  if(t<S.demonUntil)r*=.75;
+  return r;
+}
+function stageUp(t){S.stage++;S.xp=0;log('水到渠成，踏入'+STAGES[S.stage].name+'。','key',t);}
+function hitWall(t){if(!S.stuck){S.stuck=true;log('修为已至'+STAGES[S.stage].name+'瓶颈，再坐无益，需亲手冲关。','key',t);return true;}return false;}
+function advance(to){
+  const res={xp:0,ups:0,fate:0,wall:false,capped:false};
+  if(to-S.ts>DAY){S.ts=to-DAY;res.capped=true;}
+  let guard=0;
+  while(S.ts<to&&guard++<600){
+    let end=Math.min(to,nextBranch(S.ts));
+    for(const k of ['dailyUntil','streakUntil','demonUntil'])if(S[k]>S.ts&&S[k]<end)end=S[k];
+    const need=req(S.stage)-S.xp,last=STAGES[S.stage].last;
+    if(need<=0&&last){if(hitWall(S.ts))res.wall=true;S.ts=end;continue;}
+    const r=rateAt(S.ts),gain=r*(end-S.ts)/1000;
+    if(gain>=need){
+      res.xp+=need;
+      if(last){S.xp=req(S.stage);if(hitWall(S.ts))res.wall=true;S.ts=end;}
+      else{const hit=Math.min(end,Math.ceil(S.ts+need/r*1000));stageUp(hit);S.ts=Math.max(hit,S.ts+1);res.ups++;}
+    }else{S.xp+=gain;res.xp+=gain;S.ts=end;}
+  }
+  if(S.fate<FATE_CAP){
+    if(!S.fateAt)S.fateAt=to+FATE_INT;
+    while(S.fate<FATE_CAP&&S.fateAt<=to){S.fate++;res.fate++;S.fateAt+=FATE_INT;}
+  }
+  if(S.fate>=FATE_CAP)S.fateAt=0;
+  if(to>=S.streakUntil&&S.streak){S.streak=0;}
+  if(S.done.day!==dayKey(to))S.done={day:dayKey(to),ids:[]};
+  return res;
+}
+function addXp(amt,now){
+  S.xp+=amt;
+  while(S.xp>=req(S.stage)){
+    if(STAGES[S.stage].last){S.xp=req(S.stage);hitWall(now);break;}
+    const over=S.xp-req(S.stage);stageUp(now);S.xp=over;
+  }
+}
+function applyFx(fx,now){
+  const g=[];
+  if(fx.xp){const a=Math.min(rateAt(now)*60*fx.xp,req(S.stage)*Math.min(fx.xp,90)/100);addXp(a,now);g.push({x:'修为 +'+fmt(a),up:1});}
+  if(fx.stone){const b=S.stones;S.stones=Math.max(0,S.stones+Math.round(fx.stone*sc()));const d=S.stones-b;if(d)g.push({x:'灵石 '+(d>0?'+':'−')+fmt(Math.abs(d)),up:d>0});}
+  if(fx.qi){S.inv.qi+=fx.qi;g.push({x:'聚气丹 ×'+fx.qi,up:1});}
+  if(fx.po){S.inv.po+=fx.po;g.push({x:'破境丹 ×'+fx.po,up:1});}
+  if(fx.page){S.pages+=fx.page;g.push({x:'功法残页 ×'+fx.page,up:1});while(S.pages>=5){S.pages-=5;S.art++;g.push({x:'功法精进至第 '+S.art+' 重',up:1});}}
+  if(fx.luck){S.luck=clamp(S.luck+fx.luck,0,100);g.push({x:'气运 '+(fx.luck>0?'+':'−')+Math.abs(fx.luck),up:fx.luck>0});}
+  if(fx.demon){S.demonUntil=now+fx.demon*MIN;g.push({x:'心魔缠身 '+fx.demon+' 分钟',up:0});}
+  if(fx.clear&&now<S.demonUntil){S.demonUntil=0;g.push({x:'心魔已破',up:1});}
+  return g;
+}
+function breakOdds(now){
+  let c=.6-.03*STAGES[S.stage].ri;const pills=Math.min(S.inv.po,3);
+  c+=pills*.15+Math.min(streakNow(now),15)*.01+S.insight*.1;
+  if(now<S.demonUntil)c-=.2;
+  return {c:clamp(c,.05,.95),pills};
+}
+
+/* ---------- actions ---------- */
+function act(fn){
+  const now=Date.now();advance(now);
+  const out=fn(now);
+  S.savedAt=Date.now();saveLocal();pushCloud();render();
+  return out;
+}
+function doBreak(){
+  act(now=>{
+    if(!STAGES[S.stage].last||S.xp<req(S.stage))return;
+    const {c,pills}=breakOdds(now),final=S.stage===STAGES.length-1,from=STAGES[S.stage].name;
+    S.inv.po-=pills;
+    if(Math.random()<c){
+      S.insight=0;S.stuck=false;
+      if(final){
+        S.asc++;S.stage=0;S.xp=0;
+        log('九重雷劫尽数接下。你飞升而去，又带着一缕仙缘转世重修。','key',now);
+        sheet('<h3>渡劫飞升</h3><p>雷云散尽，天门洞开。你选择带着记忆重入轮回。</p><ul><li>仙缘 +1，修炼速度永久 +50%</li><li>功法、灵石、行囊随身带走</li></ul>');
+      }else{
+        S.stage++;S.xp=0;
+        log('冲关功成，自'+from+'踏入'+STAGES[S.stage].name+'。','key',now);
+        sheet('<h3>'+STAGES[S.stage].name+'</h3><p>关隘轰然洞开，灵气倒灌而入。自此'+REALMS[STAGES[S.stage].ri]+'有成。</p>'+(pills?'<ul><li>服下破境丹 '+pills+' 枚</li></ul>':''));
+      }
+    }else{
+      S.xp=req(S.stage)*.7;S.insight++;S.stuck=false;
+      log('冲关未成，修为散去三成。败中有所得，下次把握多一分。','bad',now);
+      sheet('<h3>功亏一篑</h3><p>灵气冲到关口，终究差了一线。</p><ul><li>修为退回七成</li><li>冲关心得 +1，下次成功率 +10%</li>'+(pills?'<li>破境丹 '+pills+' 枚已耗尽药力</li>':'')+'</ul>');
+    }
+  });
+}
+function doneHabit(id){
+  act(now=>{
+    const h=S.habits.find(x=>x.id===id);if(!h||S.done.ids.includes(id))return;
+    const today=dayKey(now);
+    if(S.lastDoneDay!==today){S.streak=now<S.streakUntil?S.streak+1:1;S.lastDoneDay=today;}
+    S.streakUntil=nextMidnight(now)+DAY;
+    S.done.ids.push(id);S.dailyCount=S.done.ids.length;S.dailyUntil=nextMidnight(now);
+    const st=price(25);S.stones+=st;S.luck=clamp(S.luck+2,0,100);
+    if(S.fate<FATE_MAX)S.fate++;
+    let extra='';
+    if(now<S.demonUntil){S.demonUntil=0;extra+='心魔应声而散。';}
+    if(S.done.ids.length===S.habits.length&&S.habits.length>1){S.inv.qi++;extra+='今日功课尽毕，另得聚气丹一枚。';}
+    log('日课「'+h.name+'」已毕。灵石 +'+st+'，机缘 +1，今日修炼再快一成。'+extra,'key',now);
+  });
+}
+function drawEvent(){
+  act(now=>{
+    if(S.event||S.fate<1)return;
+    S.fate--;if(S.fate<FATE_CAP&&!S.fateAt)S.fateAt=now+FATE_INT;
+    const pool=EVENTS.filter(e=>!S.recent.includes(e.id));
+    const e=pick(pool.length?pool:EVENTS);
+    S.event={id:e.id};S.outcome=null;S.recent.push(e.id);if(S.recent.length>10)S.recent.shift();
+  });
+}
+function choiceState(ch){
+  const cost=ch.cost?price(ch.cost):0,done=S.done.ids.length;
+  if(ch.need&&done<ch.need)return{ok:false,note:'需今日完成 '+ch.need+' 项日课，现为 '+done+' 项'};
+  if(cost&&S.stones<cost)return{ok:false,note:'需 '+cost+' 灵石，尚缺 '+(cost-S.stones)};
+  return{ok:true,note:cost?'耗 '+cost+' 灵石':(ch.need?'今日日课已足':'')};
+}
+function choose(i){
+  act(now=>{
+    const e=S.event&&EV[S.event.id];if(!e)return;const ch=e.c[i];if(!ch||!choiceState(ch).ok)return;
+    if(ch.cost)S.stones-=price(ch.cost);
+    const lk=S.luck/100,ws=ch.o.map(o=>o.w*(o.g===1?.5+lk:o.g===-1?1.5-lk:1));
+    let r=Math.random()*ws.reduce((a,b)=>a+b,0),k=0;for(;k<ws.length-1;k++){if(r<ws[k])break;r-=ws[k];}
+    const o=ch.o[k],gains=applyFx(o.fx,now);
+    S.outcome={t:e.t,l:ch.l,x:o.x,g:gains};S.event=null;
+    log('【'+e.t+'】'+o.x,o.g===-1?'bad':'',now);
+  });
+}
+function usePill(){act(now=>{if(S.inv.qi<1)return;S.inv.qi--;const a=Math.min(rateAt(now)*1800,req(S.stage)*.5);addXp(a,now);log('服下一枚聚气丹，修为 +'+fmt(a)+'。','',now);});}
+function buy(what){
+  act(now=>{
+    if(what==='qi'){const p=price(30);if(S.stones<p)return;S.stones-=p;S.inv.qi++;}
+    if(what==='po'){const p=price(120);if(S.stones<p)return;S.stones-=p;S.inv.po++;}
+    if(what==='array'){const p=arrayPrice();if(S.stones<p)return;S.stones-=p;S.array++;log('聚灵阵添了一层，如今 '+S.array+' 层。','',now);}
+  });
+}
+const arrayPrice=()=>Math.round(80*Math.pow(1.9,S.array));
+
+/* ---------- cloud save (per-viewer document) ---------- */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const timeout=(p,ms)=>Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej({code:'timeout'}),ms))]);
+async function initCloud(){
+  try{
+    if(!window.claude||typeof window.claude.use!=='function')return;
+    const [db,user]=await Promise.all([window.claude.use('db'),window.claude.use('user')]);
+    if(!db||!user)return;
+    const uid=await user.id();if(!uid)return;
+    cloud.ref=db.doc('data/users/'+uid+'/save');
+    const adopted=await pullCloud(true);
+    cloud.ready=true;cloud.state='synced';
+    if(!adopted&&!fresh)pushCloud();
+  }catch(e){cloud.state='local';}
+  finally{if(ui.tab==='fu'&&!ui.editName)renderPanel();}
+}
+async function pullCloud(first){
+  if(!cloud.ref)return false;
+  try{
+    const snap=await timeout(cloud.ref.get(),10000);
+    if(!snap.exists)return false;
+    const r=JSON.parse(JSON.stringify(snap.data()));
+    if(!valid(r))return false;
+    const newer=first?(fresh||(r.savedAt||0)>loadedSavedAt):(r.savedAt||0)>(S.savedAt||0);
+    if(!newer)return false;
+    const now=Date.now(),before=r.ts;
+    S=Object.assign(newGame(now),r);fresh=false;loadedSavedAt=S.savedAt||0;
+    const res=advance(now);saveLocal();render();
+    if(now-before>5*MIN)offlineSheet(now-before,res);
+    return true;
+  }catch(e){return false;}
+}
+async function pushCloud(){
+  if(!cloud.ref||!cloud.ready)return;
+  cloud.dirty=true;if(cloud.busy)return;cloud.busy=true;
+  while(cloud.dirty){
+    cloud.dirty=false;
+    const body=JSON.parse(JSON.stringify(S));
+    try{await cloud.ref.set(body);cloud.state='synced';}
+    catch(e){
+      if(e&&e.code==='unavailable'){await sleep(1500+Math.random()*1500);try{await cloud.ref.set(body);cloud.state='synced';}catch(e2){cloud.state='local';}}
+      else cloud.state='local';
+    }
+    await sleep(1200);
+  }
+  cloud.busy=false;
+}
+
+/* ---------- painting ---------- */
+let paintKey='';
+function paint(now,force){
+  const c=$('#scene'),w=c.clientWidth,h=c.clientHeight;if(!w||!h)return;
+  const d=new Date(now),key=document.documentElement.dataset.phase+Math.floor((d.getHours()*60+d.getMinutes())/10)+w+'x'+h;
+  if(key===paintKey&&!force)return;paintKey=key;
+  const dpr=Math.min(window.devicePixelRatio||1,2);c.width=w*dpr;c.height=h*dpr;
+  const g=c.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+  const css=getComputedStyle(document.documentElement),v=n=>css.getPropertyValue(n).trim();
+  const sky=g.createLinearGradient(0,0,0,h);sky.addColorStop(0,v('--sky1'));sky.addColorStop(1,v('--sky2'));
+  g.fillStyle=sky;g.fillRect(0,0,w,h);
+  const hr=d.getHours()+d.getMinutes()/60,day=isDay(now);
+  if(!day){ // fixed stars
+    let seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+    g.fillStyle=v('--ink');
+    for(let i=0;i<46;i++){const x=rnd()*w,y=rnd()*h*.55,r=rnd()*1.1+.3;g.globalAlpha=.25+rnd()*.5;g.beginPath();g.arc(x,y,r,0,7);g.fill();}
+    g.globalAlpha=1;
+  }
+  const p=day?(hr-5)/14:((hr-19+24)%24)/10;
+  const bx=w*(.3+.6*p),by=h*(.5-Math.sin(Math.PI*p)*.36);
+  g.fillStyle=day?v('--cinnabar'):v('--ink');g.globalAlpha=day?.85:.9;
+  g.beginPath();g.arc(bx,by,day?13:11,0,7);g.fill();g.globalAlpha=1;
+  const tri=u=>1-Math.abs(Math.sin(u));
+  const layers=[
+    {b:.66,s:.32,a:.20,n:2.3,p:.4,c:'--m1',al:.75},
+    {b:.78,s:.30,a:.17,n:3.1,p:1.7,c:'--m2',al:1,gold:1},
+    {b:.90,s:.22,a:.13,n:4.3,p:.9,c:'--m3',al:1,gold:1},
+    {b:1.0,s:.10,a:.09,n:5.6,p:2.6,c:'--m4',al:1}];
+  for(const L of layers){
+    const y=x=>{const u=x/w;return h*(L.b-L.s*u)-h*L.a*(.6*tri(Math.PI*u*L.n+L.p)+.28*tri(Math.PI*u*L.n*2.3+L.p*2)+.12*Math.sin(u*31+L.p));};
+    g.beginPath();g.moveTo(0,h);for(let x=0;x<=w;x+=2)g.lineTo(x,y(x));g.lineTo(w,h);g.closePath();
+    g.globalAlpha=L.al;g.fillStyle=v(L.c);g.fill();
+    if(L.gold){g.beginPath();for(let x=0;x<=w;x+=2)x?g.lineTo(x,y(x)):g.moveTo(x,y(x));g.globalAlpha=.55;g.strokeStyle=v('--gold');g.lineWidth=1;g.stroke();}
+    g.globalAlpha=1;
+  }
+  const mist=g.createLinearGradient(0,h-26,0,h);mist.addColorStop(0,'rgba(0,0,0,0)');mist.addColorStop(1,v('--bg'));
+  g.fillStyle=mist;g.fillRect(0,h-26,w,26);
+}
+function setPhase(now){
+  const ph=isDay(now)?'day':'night';
+  if(document.documentElement.dataset.phase!==ph){document.documentElement.dataset.phase=ph;paint(now,true);}else paint(now);
+}
+
+/* ---------- rendering ---------- */
+function sheet(html){$('#sheetBody').innerHTML=html+'<button class="btn pri" type="button" data-act="closeSheet">知道了</button>';$('#sheet').hidden=false;const b=$('#sheetBody button:last-child');if(b)b.focus();}
+function offlineSheet(ms,res){
+  const h=Math.floor(Math.min(ms,DAY)/HOUR),m=Math.floor(Math.min(ms,DAY)%HOUR/MIN);
+  sheet('<h3>闭关归来</h3><p>你闭关了 '+(h?h+' 小时 ':'')+m+' 分。</p><ul><li>修为 +'+fmt(res.xp)+'</li>'+
+    (res.ups?'<li>连破 '+res.ups+' 重小境界，现为'+STAGES[S.stage].name+'</li>':'')+
+    (res.fate?'<li>新得机缘 '+res.fate+' 道</li>':'')+
+    (S.stuck?'<li>修为已至瓶颈，等你亲手冲关</li>':'')+
+    (res.capped?'<li>一次闭关至多十二个时辰，其后的光阴未计入</li>':'')+'</ul>');
+}
+function updateLive(now){
+  const st=STAGES[S.stage],need=req(S.stage),full=st.last&&S.xp>=need,b=branchIdx(now);
+  $('#realm').textContent=st.name;$('#seal').textContent=S.root.el;
+  $('#daoName').textContent=S.name;$('#hourName').textContent=BRANCH[b]+'时 · '+BRANCH_ALIAS[b];
+  $('#stones').textContent=fmt(S.stones);
+  $('#xpNow').textContent=fmt(S.xp);$('#xpReq').textContent=fmt(need);
+  $('#rate').textContent=full?'瓶颈':'每秒 +'+fmtRate(rateAt(now));
+  $('#bar').style.width=clamp(S.xp/need*100,0,100).toFixed(2)+'%';
+  $('#barWrap').classList.toggle('full',full);
+  const btn=$('#breakBtn'),note=$('#note');
+  if(full){
+    const {c,pills}=breakOdds(now),final=S.stage===STAGES.length-1;
+    btn.hidden=false;btn.textContent=(final?'渡劫飞升':'冲关')+' · 成算 '+Math.round(c*100)+'%';
+    note.textContent=pills?'将服破境丹 '+pills+' 枚':(now<S.demonUntil?'心魔在侧，成算减两成':'破境丹、道心可添成算');
+  }else{
+    btn.hidden=true;
+    const left=(need-S.xp)/rateAt(now);
+    note.textContent=(st.last?'距瓶颈约 ':'距'+STAGES[S.stage+1].name+'约 ')+fmtDur(left);
+  }
+  const doneN=S.done.ids.length;
+  const tk=$('#tKe');tk.textContent=doneN+'/'+S.habits.length;tk.classList.toggle('hot',doneN<S.habits.length);
+  const ty=$('#tYuan');ty.textContent=S.event?'待决':(S.fate?S.fate+' 道':(S.fateAt?fmtClock(S.fateAt-now):''));ty.classList.toggle('hot',!!S.event||S.fate>0);
+  $('#tXiu').textContent=now<S.demonUntil?'心魔 '+fmtClock(S.demonUntil-now):'';
+  $('#tFu').textContent=S.inv.qi?'丹 '+S.inv.qi:'';
+  const ft=$('#fateTimer');if(ft)ft.textContent=S.fateAt?fmtClock(S.fateAt-now):'';
+  const dt=$('#demonTimer');if(dt)dt.textContent=fmtClock(S.demonUntil-now);
+  document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected',x.dataset.tab===ui.tab));
+}
+function fmtDur(s){if(s<60)return Math.ceil(s)+' 秒';if(s<3600)return Math.ceil(s/60)+' 分';if(s<86400)return (s/3600).toFixed(1)+' 小时';return (s/86400).toFixed(1)+' 天';}
+function logTime(t){const d=new Date(t);return pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+BRANCH[branchIdx(t)]+'时';}
+
+function viewXiu(now){
+  const bs=bonuses(now),demon=now<S.demonUntil;
+  let h='<section class="sec"><div class="chips">';
+  h+=bs.length||demon?'':'<span class="chip">此刻无加成 · 子午卯酉四时修炼 +25%</span>';
+  for(const b of bs)h+='<span class="chip up">'+esc(b.l)+' +'+Math.round(b.v*100)+'%</span>';
+  if(demon)h+='<span class="chip down">心魔 −25% · <span id="demonTimer">'+fmtClock(S.demonUntil-now)+'</span></span>';
+  h+='</div>';
+  if(demon)h+='<p class="hint">完成任意一项日课，心魔即散。</p>';
+  if(S.event)h+='<div class="callout"><span>有一道机缘等你决断</span><button class="btn" type="button" data-act="tab" data-tab="yuan">前往</button></div>';
+  else if(S.fate)h+='<div class="callout"><span>机缘 '+S.fate+' 道，尚未探访</span><button class="btn" type="button" data-act="tab" data-tab="yuan">前往</button></div>';
+  h+='</section><section class="sec"><h2>修行日志</h2><ol class="log">';
+  for(const e of S.log)h+='<li class="'+esc(e.k||'')+'"><time>'+logTime(e.t)+'</time><p>'+esc(e.x)+'</p></li>';
+  return h+'</ol></section>';
+}
+function viewKe(now){
+  const st=streakNow(now),doneN=S.done.ids.length;
+  let h='<section class="sec"><h2>今日功课<small>'+doneN+' / '+S.habits.length+' · '+(st?'连续 '+st+' 日，道心 +'+Math.min(st,20)*3+'%':'今日起算')+'</small></h2>';
+  if(ui.editHabits){
+    h+='<ul class="habits">';
+    ui.draft.forEach((x,i)=>{h+='<li class="habit edit"><input type="text" id="hn'+i+'" maxlength="6" value="'+esc(x.name)+'" aria-label="名目"><input type="text" id="hd'+i+'" maxlength="30" value="'+esc(x.desc)+'" aria-label="做什么"><button class="btn warn" type="button" data-act="delHabit" data-i="'+i+'"'+(ui.draft.length<2?' disabled':'')+'>删</button></li>';});
+    h+='</ul><div class="acts"><button class="btn pri" type="button" data-act="saveHabits">存下</button>'+(ui.draft.length<6?'<button class="btn" type="button" data-act="addHabit">添一项</button>':'')+'<button class="btn" type="button" data-act="cancelHabits">不改了</button></div>';
+    h+='<p class="hint">名目至多六字，功课至多六项。改动不影响今天已记下的完成。</p>';
+  }else{
+    h+='<ul class="habits">';
+    for(const x of S.habits){
+      const d=S.done.ids.includes(x.id);
+      h+='<li class="habit"><div class="txt"><b>'+esc(x.name)+'</b><span>'+esc(x.desc)+'</span></div>'+(d?'<span class="mark" aria-label="已完成">毕</span>':'<button class="btn pri" type="button" data-act="done" data-id="'+esc(x.id)+'">做完了</button>')+'</li>';
+    }
+    h+='</ul><p class="hint">现实里做完，回来记一笔。每记一项：灵石 +'+price(25)+'，机缘 +1，到今夜子正前修炼 +10%，心魔立散。全部做完另得聚气丹一枚。连续的天数养成道心，每日 +3%，至多 +60%，断一天归零。</p>';
+    h+='<div class="acts"><button class="btn" type="button" data-act="editHabits">修订功课</button></div>';
+  }
+  return h+'</section>';
+}
+function viewYuan(now){
+  let h='<section class="sec"><h2>机缘<small>'+S.fate+' 道'+(S.fateAt?' · 下一道 <span id="fateTimer">'+fmtClock(S.fateAt-now)+'</span>':'')+'</small></h2>';
+  if(S.event){
+    const e=EV[S.event.id];
+    h+='<article class="card"><h3>'+esc(e.t)+'</h3><p class="story">'+esc(e.x)+'</p><div class="choices">';
+    e.c.forEach((ch,i)=>{const s=choiceState(ch);h+='<button class="choice" type="button" data-act="choose" data-i="'+i+'"'+(s.ok?'':' disabled')+'><span>'+esc(ch.l)+'</span>'+(s.note?'<small>'+esc(s.note)+'</small>':'')+'</button>';});
+    h+='</div></article>';
+  }else{
+    if(S.outcome){
+      const o=S.outcome;
+      h+='<article class="card"><h3>'+esc(o.t)+'</h3><p class="picked">你选了：'+esc(o.l)+'</p><p class="story">'+esc(o.x)+'</p>';
+      if(o.g&&o.g.length){h+='<div class="gains">';for(const g of o.g)h+='<span class="chip '+(g.up?'up':'down')+'">'+esc(g.x)+'</span>';h+='</div>';}
+      else h+='<p class="hint">无得无失。</p>';
+      h+='</article>';
+    }
+    h+=S.fate?'<div class="acts"><button class="btn gold" type="button" data-act="draw">探访一道机缘</button></div>'
+      :'<p class="empty">机缘未至。每两刻钟自来一道，至多攒三道；做完一项日课，立得一道。</p>';
+  }
+  h+='<p class="hint">气运 '+S.luck+'。气运越高，好结果越常见。带「需日课」的选项，只有今天真做了功课才选得了。</p>';
+  return h+'</section>';
+}
+function viewFu(now){
+  const root=ROOTS[S.root.el],gr=GRADES[S.root.g];
+  let h='<section class="sec"><h2>道籍</h2>';
+  h+=ui.editName?'<div class="row"><input type="text" id="nameInput" maxlength="8" value="'+esc(S.name)+'" aria-label="道号"><div class="acts"><button class="btn pri" type="button" data-act="saveName">存下</button></div></div>'
+    :'<div class="row"><div class="txt"><b>'+esc(S.name)+'</b><span>道号</span></div><button class="btn" type="button" data-act="editName">改道号</button></div>';
+  h+='<div class="row"><div class="txt"><b>'+S.root.el+'属 · '+gr.n+'</b><span>根基 ×'+gr.m+'，'+root.when+'修炼 +'+Math.round(root.bonus*100)+'%</span></div></div>';
+  h+='<div class="row"><div class="txt"><b>功法第 '+S.art+' 重 · 残页 '+S.pages+' / 5</b><span>每重修炼 +12%，残页从机缘中来</span></div></div>';
+  if(S.asc)h+='<div class="row"><div class="txt"><b>仙缘 '+S.asc+'</b><span>每缕修炼 +50%</span></div></div>';
+  h+='</section><section class="sec"><h2>行囊</h2>';
+  h+='<div class="row"><div class="txt"><b>聚气丹 ×'+S.inv.qi+'</b><span>立得两刻钟的修为，至多半重境界</span></div><button class="btn pri" type="button" data-act="usePill"'+(S.inv.qi?'':' disabled')+'>服一枚</button></div>';
+  h+='<div class="row"><div class="txt"><b>破境丹 ×'+S.inv.po+'</b><span>冲关时自动服用，每枚成算 +15%，至多三枚</span></div></div>';
+  h+='</section><section class="sec"><h2>坊市<small>灵石 '+fmt(S.stones)+'</small></h2>';
+  const shop=[['qi','聚气丹','立得两刻钟的修为',price(30)],['po','破境丹','冲关成算 +15%',price(120)],['array','聚灵阵第 '+(S.array+1)+' 层','修炼永久 +15%，现有 '+S.array+' 层',arrayPrice()]];
+  for(const [k,n,d,p] of shop)h+='<div class="row"><div class="txt"><b>'+n+'</b><span>'+d+'</span></div><button class="btn" type="button" data-act="buy" data-what="'+k+'"'+(S.stones>=p?'':' disabled')+'>'+fmt(p)+' 灵石</button></div>';
+  h+='</section><section class="sec"><h2>存档</h2><p class="hint">'+(cloud.state==='synced'?'进度随你的 Claude 账号保存，换设备打开也在。':'进度暂存在这台设备的浏览器里。')+'离开时照常修炼，一次至多计十二个时辰。</p>';
+  h+=ui.confirmReset?'<div class="acts"><button class="btn warn" type="button" data-act="resetYes">确定散功重来</button><button class="btn" type="button" data-act="resetNo">再想想</button></div>'
+    :'<div class="acts"><button class="btn" type="button" data-act="resetAsk">散功重来</button></div>';
+  return h+'</section>';
+}
+function renderPanel(){
+  const now=Date.now(),p=$('#panel');
+  p.innerHTML=({xiu:viewXiu,ke:viewKe,yuan:viewYuan,fu:viewFu})[ui.tab](now);
+}
+function render(){renderPanel();updateLive(Date.now());}
+function setTab(t){ui.tab=t;ui.editHabits=false;ui.draft=null;ui.editName=false;ui.confirmReset=false;render();$('#panel').scrollTop=0;}
+function readHabitInputs(){
+  ui.draft.forEach((x,i)=>{const n=$('#hn'+i),d=$('#hd'+i);if(n&&n.value.trim())x.name=n.value.trim().slice(0,6);if(d)x.desc=d.value.trim().slice(0,30);});
+}
+
+/* ---------- wiring ---------- */
+function wire(){
+  document.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.closest('button[data-tab]');if(b)setTab(b.dataset.tab);});
+  $('#breakBtn').addEventListener('click',doBreak);
+  $('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet'||e.target.closest('[data-act=closeSheet]'))$('#sheet').hidden=true;});
+  $('#panel').addEventListener('click',e=>{
+    const b=e.target.closest('[data-act]');if(!b||b.disabled)return;const a=b.dataset.act;
+    if(a==='tab')setTab(b.dataset.tab);
+    else if(a==='done')doneHabit(b.dataset.id);
+    else if(a==='draw')drawEvent();
+    else if(a==='choose')choose(+b.dataset.i);
+    else if(a==='usePill')usePill();
+    else if(a==='buy')buy(b.dataset.what);
+    else if(a==='editHabits'){ui.draft=JSON.parse(JSON.stringify(S.habits));ui.editHabits=true;renderPanel();}
+    else if(a==='cancelHabits'){ui.editHabits=false;ui.draft=null;renderPanel();}
+    else if(a==='addHabit'){readHabitInputs();ui.draft.push({id:'h'+Date.now().toString(36),name:'新课',desc:''});renderPanel();}
+    else if(a==='delHabit'){readHabitInputs();ui.draft.splice(+b.dataset.i,1);renderPanel();}
+    else if(a==='saveHabits'){readHabitInputs();const d=ui.draft;ui.editHabits=false;ui.draft=null;act(()=>{S.habits=d;S.done.ids=S.done.ids.filter(i=>d.some(x=>x.id===i));});}
+    else if(a==='editName'){ui.editName=true;renderPanel();const i=$('#nameInput');if(i)i.focus();}
+    else if(a==='saveName'){const v=($('#nameInput').value||'').trim().slice(0,8);ui.editName=false;act(()=>{if(v)S.name=v;});}
+    else if(a==='resetAsk'){ui.confirmReset=true;renderPanel();}
+    else if(a==='resetNo'){ui.confirmReset=false;renderPanel();}
+    else if(a==='resetYes'){ui.confirmReset=false;const now=Date.now();S=newGame(now);fresh=false;S.savedAt=now;saveLocal();pushCloud();setTab('xiu');}
+  });
+  window.addEventListener('resize',()=>paint(Date.now(),true));
+  document.addEventListener('visibilitychange',async()=>{
+    if(document.hidden){saveLocal();return;}
+    const pulled=cloud.ready?await pullCloud(false):false;
+    if(!pulled){const now=Date.now(),before=S.ts,res=advance(now);if(!ui.editHabits&&!ui.editName)render();else updateLive(now);if(now-before>30*MIN)offlineSheet(now-before,res);}
+  });
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>paint(Date.now(),true));
+}
+let lastLocal=0,lastAmbient=Date.now();
+function tick(){
+  const now=Date.now(),res=advance(now);
+  setPhase(now);
+  let dirty=res.ups||res.fate||res.wall;
+  if(now-lastAmbient>5*MIN&&!S.stuck){lastAmbient=now;log(pick(AMBIENT),'',now);dirty=dirty||ui.tab==='xiu';}
+  if(dirty&&!ui.editHabits&&!ui.editName)renderPanel();
+  updateLive(now);
+  if(now-lastLocal>15000){lastLocal=now;saveLocal();}
+}
+function start(hot){
+  const now=Date.now(),local=loadLocal();
+  if(valid(hot)){S=hot;loadedSavedAt=S.savedAt||0;}
+  else if(valid(local)){S=Object.assign(newGame(now),local);loadedSavedAt=S.savedAt||0;}
+  else{S=newGame(now);fresh=true;}
+  const before=S.ts,res=advance(now);
+  wire();document.documentElement.dataset.phase=isDay(now)?'day':'night';
+  render();paint(now,true);
+  if(!fresh&&now-before>5*MIN)offlineSheet(now-before,res);
+  setInterval(tick,1000);
+  initCloud();
+}
+const hotApi=window.claude&&window.claude.hot;
+if(hotApi&&typeof hotApi.snapshot==='function')hotApi.snapshot(()=>JSON.parse(JSON.stringify(S)));
+if(hotApi&&typeof hotApi.ready==='function')hotApi.ready(start);else start((hotApi&&hotApi.data)||{});
+})();
+</script>
+</body>
+</html>
